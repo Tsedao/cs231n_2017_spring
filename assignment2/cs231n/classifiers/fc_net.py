@@ -196,6 +196,13 @@ class FullyConnectedNet(object):
         	b_name = 'b%d'%(idx+1)
         	self.params[w_name] = np.random.normal(scale=weight_scale,size=(dim_in,dim_out))
         	self.params[b_name] = np.zeros(shape=(dim_out,))
+
+        if self.use_batchnorm:
+            for idx in range(self.num_layers-1):
+                gamma = 'gamma%d'%(idx+1)
+                beta = 'beta%d'%(idx+1)
+                self.params[gamma] = np.ones(shape=(hidden_dims[idx],))  # initialize the scale parameter
+                self.params[beta] = np.zeros(shape=(hidden_dims[idx],))   # initialize the shift parameter
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -255,13 +262,19 @@ class FullyConnectedNet(object):
         ############################################################################
         caches = []
         for idx in range(self.num_layers):
-        	w = 'W%d'%(idx+1)
-        	b = 'b%d'%(idx+1)
-	       	if idx < self.num_layers-1:
-        		X, cache = affine_relu_forward(X,self.params[w],self.params[b])
-        	else:
-        		scores, cache = affine_forward(X,self.params[w],self.params[b])
-        	caches.append(cache) 
+            w = 'W%d'%(idx+1)
+            b = 'b%d'%(idx+1)
+            if idx < self.num_layers-1:
+                if self.use_batchnorm:
+                    gamma = 'gamma%d'%(idx+1)
+                    beta = 'beta%d'%(idx+1)
+                    X, cache = affine_bn_relu_forward(X, self.params[w],self.params[b],
+                                   self.params[gamma],self.params[beta],self.bn_params[idx])
+                else:
+                    X, cache = affine_relu_forward(X,self.params[w],self.params[b])
+            else:
+                scores, cache = affine_forward(X,self.params[w],self.params[b])
+            caches.append(cache) 
 
         ############################################################################
         #                             END OF YOUR CODE                             #
@@ -287,15 +300,22 @@ class FullyConnectedNet(object):
         ############################################################################
         loss, dx = softmax_loss(scores,y)
         for idx in range(self.num_layers,0,-1):
-        	w = 'W%d'%(idx)
-	       	b = 'b%d'%(idx)
-	       	if idx == self.num_layers:
-	       		dx, dw, db = affine_backward(dx,caches.pop())
-	       	else:
-	       		dx, dw, db = affine_relu_backward(dx,caches.pop())
-	       	loss += 0.5*self.reg*np.sum(self.params[w]*self.params[w]) 
-	       	grads[w] = dw + self.reg*self.params[w]
-	       	grads[b] = db
+            w = 'W%d'%(idx)
+            b = 'b%d'%(idx)
+            if idx == self.num_layers:
+                dx, dw, db = affine_backward(dx,caches.pop())
+            else:
+                if self.use_batchnorm:
+                    gamma = 'gamma%d'%(idx)
+                    beta = 'beta%d'%(idx)
+                    dx, dw, db, dgamma, dbeta = affine_bn_relu_backward(dx,caches.pop())
+                    grads[gamma] = dgamma
+                    grads[beta] = dbeta
+                else:
+                    dx, dw, db = affine_relu_backward(dx,caches.pop())
+            loss += 0.5*self.reg*np.sum(self.params[w]*self.params[w]) 
+            grads[w] = dw + self.reg*self.params[w]
+            grads[b] = db
 
         ############################################################################
         #                             END OF YOUR CODE                             #
