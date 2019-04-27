@@ -272,9 +272,15 @@ class FullyConnectedNet(object):
                                    self.params[gamma],self.params[beta],self.bn_params[idx])
                 else:
                     X, cache = affine_relu_forward(X,self.params[w],self.params[b])
+                caches.append(cache)
+
+                if self.use_dropout:
+                    X, cache = dropout_forward(X,self.dropout_param)
+                    caches.append(cache) 
             else:
                 scores, cache = affine_forward(X,self.params[w],self.params[b])
-            caches.append(cache) 
+                caches.append(cache) 
+            
 
         ############################################################################
         #                             END OF YOUR CODE                             #
@@ -305,6 +311,9 @@ class FullyConnectedNet(object):
             if idx == self.num_layers:
                 dx, dw, db = affine_backward(dx,caches.pop())
             else:
+                if self.use_dropout:
+                    dx = dropout_backward(dx,caches.pop())
+                    
                 if self.use_batchnorm:
                     gamma = 'gamma%d'%(idx)
                     beta = 'beta%d'%(idx)
